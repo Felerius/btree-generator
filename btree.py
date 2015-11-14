@@ -75,6 +75,8 @@ def generate_graph(data):
 
 def generate_node_graph(node_data, name, num_keys):
     """Generate NodeData for a single node and its descendents."""
+    if isinstance(node_data, list):
+        node_data = {'keys': node_data}
     if 'keys' not in node_data:
         return NodeData(name, None, [], [])
     keys = fill_to_length(node_data['keys'], num_keys, DUMMY_KEY)
