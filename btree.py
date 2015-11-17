@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """A script to generate dot files for nice looking B+ tree diagrams."""
+import argparse
 import itertools
+import sys
+import yaml
+
+PROGRAM_DESCRIPTION='''\
+Creates a dot language graph for a B+ tree read from a yaml data file.
+Have a look at the examples for the format of the yaml file.
+'''
 
 GRAPH_TEMPLATE = '''digraph G
 {{
@@ -275,13 +283,14 @@ def pairwise(iterable):
 
 def main():
     """Main function. Called when run as main module."""
-    import sys
-    import yaml
-    if len(sys.argv) > 1:
-        with open(sys.argv[1]) as in_file:
-            data = yaml.safe_load(in_file)
-    else:
-        data = yaml.safe_load(sys.stdin)
+    parser = argparse.ArgumentParser(description=PROGRAM_DESCRIPTION)
+    parser.add_argument('datafile',
+                        nargs='?',
+                        type=argparse.FileType('r'),
+                        default=sys.stdin,
+                        help='read data from a file instead of stdin')
+    args = parser.parse_args()
+    data = yaml.safe_load(args.datafile)
     tree = BPlusTree(data['keys_per_block'], data['tree'])
     print(generate_dot_graph(tree))
 
