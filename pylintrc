@@ -1,0 +1,4 @@
+[MESSAGES CONTROL]
+# Disable the following:
+# R0903: Too few public methods
+disable=R0903
