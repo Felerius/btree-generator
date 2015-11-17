@@ -43,7 +43,7 @@ On the top level, there is an attribute named `keys_per_block` specifying the ma
 Another attribute named `tree` contains the actual tree data.
 Each block has two attributes:
   - `keys`, a list of keys contained in the block.
-    You can leave out empty keys here, the block will be filled up with underscores automatically, as you can see in the leftmost leaf.
+    You can leave out empty keys here, the block will be automatically filled up with underscores to represent missing keys, as you can see in the leftmost leaf.
   - `children`, a list of child blocks.
   
 For leaf blocks you can just specify the block as a list containing the keys, as has been done here for all leaves.
