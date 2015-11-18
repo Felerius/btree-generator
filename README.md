@@ -56,3 +56,24 @@ This can be achieved by simply placing placeholder blocks and completely leaving
 
 The generation of pointers between leaves will also be adjusted.
 In the image above the pointer between `[11, 13]` and the `[67, 69]` block has been omitted, because due to the structure of B+ trees there must be other leaves in the omitted middle part of the tree, and therefore the two blocks would not be directly connected.
+
+### Highlighting
+
+![Image of a B+ tree with parts of the tree omitted](https://github.com/Felerius/btree-generator/raw/master/images/highlighting.png)
+
+To highlight parts of the B+ tree, simply add the attribute `highlight` with a value of `true` to the blocks you want highlighted.
+Edges between highlighted blocks will be highlighted automatically.
+The example above was generated from the following:
+```yaml
+keys_per_block: 2
+tree:
+  keys: [3, 6]
+  highlight: true
+  children:
+    - keys: [1]
+      highlight: true
+    - [3, 5]
+    - [6, 8]
+```
+
+Unfortunately, you can no longer use the shorthand notation for leaves when highlighting a leaf.
