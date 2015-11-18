@@ -5,7 +5,7 @@ import itertools
 import sys
 import yaml
 
-PROGRAM_DESCRIPTION='''\
+PROGRAM_DESCRIPTION = '''\
 Creates a dot language graph for a B+ tree read from a yaml data file.
 Have a look at the examples for the format of the yaml file.
 '''
@@ -18,10 +18,11 @@ GRAPH_TEMPLATE = '''digraph G
 {parent_child_edges}
 
 {cross_edges}
+
+{rank_statements}
 }}'''
 
-NODES_INDENT = 4
-EDGES_INDENT = 4
+INSIDE_GRAPH_INDENT = 4
 
 NODE_TEMPLATE = '''"{name}"
 [
@@ -38,9 +39,8 @@ CONNECTOR_TEMPLATE = '<td port="connector{number}"></td>'
 CONNECTOR_NAME_TEMPLATE = 'connector{number}'
 KEY_TEMPLATE = '<td port="key{number}">{content}</td>'
 KEY_NAME_TEMPLATE = 'key{number}'
-PARENT_CHILD_EDGE_TEMPLATE = '"{src_node}":"{src_port}" -> "{dst_node}":"{dst_port}"'
-LEAF_CROSS_EDGE_TEMPLATE = \
-    '"{src_node}":"{src_port}" -> "{dst_node}":"{dst_port}" [constraint=false]'
+EDGE_TEMPLATE = '"{src_node}":"{src_port}" -> "{dst_node}":"{dst_port}"'
+RANK_SAME_TEMPLATE = '{{rank=same; {blocks}}}'
 
 DUMMY_KEY = '_'
 
@@ -58,6 +58,11 @@ class BPlusTree:
     def children_per_block(self):
         """Returns the maximum number of children per block"""
         return self.keys_per_block + 1
+
+    @property
+    def all_indices(self):
+        """Returns all indices which have associated blocks"""
+        return self._indexed_blocks.keys()
 
     @property
     def all_blocks(self):
@@ -109,6 +114,10 @@ class BPlusTree:
         if parent_sibling is None:
             return None
         return self.nth_child(parent_sibling, 0)
+
+    def level(self, index):
+        """Returns the level of index. This is 0 for the root index"""
+        return len(index)
 
     def was_omitted(self, index):
         """Returns whether a block should have been included.
@@ -181,7 +190,7 @@ def generate_parent_child_edges(tree, index):
     """Generates parent to child edges for the subtree below the index"""
     children = (c for c in tree.children(index) if tree[c] is not None)
     for i, child in enumerate(children):
-        yield PARENT_CHILD_EDGE_TEMPLATE.format(
+        yield EDGE_TEMPLATE.format(
             src_node=generate_node_name(index),
             src_port=CONNECTOR_NAME_TEMPLATE.format(number=i),
             dst_node=generate_node_name(child),
@@ -224,7 +233,7 @@ def generate_cross_edge_range(tree, leaves):
     left_port = CONNECTOR_NAME_TEMPLATE.format(number=0)
     right_port = CONNECTOR_NAME_TEMPLATE.format(number=tree.keys_per_block)
     for index1, index2 in pairwise(leaves):
-        yield LEAF_CROSS_EDGE_TEMPLATE.format(
+        yield EDGE_TEMPLATE.format(
             src_node=generate_node_name(index1),
             src_port=right_port,
             dst_node=generate_node_name(index2),
@@ -248,16 +257,27 @@ def generate_cross_edges(tree):
         index = tree.right_sibling(adjacent_leaves[-1])
 
 
+def generate_same_rank_statements(tree):
+    """Generate statements to constrain nodes to the same rank"""
+    indices = sorted(tree.all_indices, key=tree.level)
+    grouped = itertools.groupby(indices, tree.level)
+    for _, group in grouped:
+        blocks = ' '.join('"' + generate_node_name(i) + '"' for i in group)
+        yield RANK_SAME_TEMPLATE.format(blocks=blocks)
+
+
 def generate_dot_graph(tree):
     """Generates a dot graph string from a B+ tree"""
     nodes = '\n'.join(generate_dot_node(tree, i, k) for i, k in tree.all_blocks)
     parent_child_edges = '\n'.join(generate_parent_child_edges(tree,
                                                                tree.root_index))
     cross_edges = '\n'.join(generate_cross_edges(tree))
+    rank_statements = '\n'.join(generate_same_rank_statements(tree))
     return GRAPH_TEMPLATE.format(
-        nodes=indent(nodes, NODES_INDENT),
-        parent_child_edges=indent(parent_child_edges, EDGES_INDENT),
-        cross_edges=indent(cross_edges, EDGES_INDENT)
+        nodes=indent(nodes, INSIDE_GRAPH_INDENT),
+        parent_child_edges=indent(parent_child_edges, INSIDE_GRAPH_INDENT),
+        cross_edges=indent(cross_edges, INSIDE_GRAPH_INDENT),
+        rank_statements=indent(rank_statements, INSIDE_GRAPH_INDENT)
     )
 
 
