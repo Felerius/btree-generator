@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """A script to generate dot files for nice looking B+ tree diagrams."""
 import argparse
+import collections
 import itertools
 import sys
 import yaml
@@ -45,6 +46,9 @@ RANK_SAME_TEMPLATE = '{{rank=same; {blocks}}}'
 DUMMY_KEY = '_'
 
 
+Block = collections.namedtuple('Block', ('keys', 'data'))
+
+
 class BPlusTree:
     """A B+ tree with possibly omitted subtrees"""
 
@@ -69,7 +73,7 @@ class BPlusTree:
         """An iterable of all blocks with their indices
 
         Returns an iterable of tuples, which contain the index of the
-        block and a list of the keys.
+        block and the block itself.
         """
         return self._indexed_blocks.items()
 
@@ -150,7 +154,9 @@ class BPlusTree:
         # Allow simple lists of keys for leaves
         if not isinstance(block_tree, dict):
             block_tree = {'keys': block_tree}
-        self._indexed_blocks[index] = block_tree['keys']
+        data = {k: v for k, v in block_tree.items()
+                if k not in {'keys', 'children'}}
+        self._indexed_blocks[index] = Block(block_tree['keys'], data)
         children = block_tree.get('children', [])
         for i, child_tree in enumerate(children):
             self._add_block(self.nth_child(index, i), child_tree)
@@ -168,18 +174,18 @@ def find_middle_port_name(tree):
     return CONNECTOR_NAME_TEMPLATE.format(number=(tree.keys_per_block + 1) // 2)
 
 
-def generate_node_cells(tree, keys):
+def generate_node_cells(tree, block):
     """Generates the table cells for a single block node"""
-    keys = pad(keys, tree.keys_per_block, DUMMY_KEY)
+    keys = pad(block.keys, tree.keys_per_block, DUMMY_KEY)
     for i, key in enumerate(keys):
         yield CONNECTOR_TEMPLATE.format(number=i)
         yield KEY_TEMPLATE.format(number=i, content=key)
     yield CONNECTOR_TEMPLATE.format(number=tree.children_per_block - 1)
 
 
-def generate_dot_node(tree, index, keys):
+def generate_dot_node(tree, index, block):
     """Generates a dot node to render a single block"""
-    cells = generate_node_cells(tree, keys)
+    cells = generate_node_cells(tree, block)
     return NODE_TEMPLATE.format(
         name=generate_node_name(index),
         cells=indent('\n'.join(cells), CELL_INDENT)
