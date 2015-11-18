@@ -34,6 +34,18 @@ NODE_TEMPLATE = '''"{name}"
                 </tr>
             </table>>
 ]'''
+HIGHLIGHTED_NODE_TEMPLATE = '''"{name}"
+[
+    shape = none
+    color = red
+    fontcolor = red
+    fontname = "bold"
+    label = <<table border="2" cellborder="0" cellspacing="0">
+                <tr>
+{cells}
+                </tr>
+            </table>>
+]'''
 
 CELL_INDENT = 20
 CONNECTOR_TEMPLATE = '<td port="connector{number}"></td>'
@@ -41,6 +53,8 @@ CONNECTOR_NAME_TEMPLATE = 'connector{number}'
 KEY_TEMPLATE = '<td port="key{number}">{content}</td>'
 KEY_NAME_TEMPLATE = 'key{number}'
 EDGE_TEMPLATE = '"{src_node}":"{src_port}" -> "{dst_node}":"{dst_port}"'
+HIGHLIGHTED_EDGE_TEMPLATE = \
+    '"{src_node}":"{src_port}" -> "{dst_node}":"{dst_port}" [color=red, penwidth=2]'
 RANK_SAME_TEMPLATE = '{{rank=same; {blocks}}}'
 
 DUMMY_KEY = '_'
@@ -174,6 +188,10 @@ def find_middle_port_name(tree):
     return CONNECTOR_NAME_TEMPLATE.format(number=(tree.keys_per_block + 1) // 2)
 
 
+def is_highlighted(block):
+    return block.data.get('highlight', False)
+
+
 def generate_node_cells(tree, block):
     """Generates the table cells for a single block node"""
     keys = pad(block.keys, tree.keys_per_block, DUMMY_KEY)
@@ -185,8 +203,11 @@ def generate_node_cells(tree, block):
 
 def generate_dot_node(tree, index, block):
     """Generates a dot node to render a single block"""
+    template = NODE_TEMPLATE
+    if is_highlighted(block):
+        template = HIGHLIGHTED_NODE_TEMPLATE
     cells = generate_node_cells(tree, block)
-    return NODE_TEMPLATE.format(
+    return template.format(
         name=generate_node_name(index),
         cells=indent('\n'.join(cells), CELL_INDENT)
     )
@@ -194,15 +215,21 @@ def generate_dot_node(tree, index, block):
 
 def generate_parent_child_edges(tree, index):
     """Generates parent to child edges for the subtree below the index"""
-    children = (c for c in tree.children(index) if tree[c] is not None)
+    highlighted = is_highlighted(tree[index])
+    children = ((i, tree[i]) for i in tree.children(index))
+    children = ((i, block) for i, block in children if block is not None)
     for i, child in enumerate(children):
-        yield EDGE_TEMPLATE.format(
+        child_index, child_block = child
+        template = EDGE_TEMPLATE
+        if highlighted and is_highlighted(child_block):
+            template = HIGHLIGHTED_EDGE_TEMPLATE
+        yield template.format(
             src_node=generate_node_name(index),
             src_port=CONNECTOR_NAME_TEMPLATE.format(number=i),
-            dst_node=generate_node_name(child),
+            dst_node=generate_node_name(child_index),
             dst_port=find_middle_port_name(tree)
         )
-        yield from generate_parent_child_edges(tree, child)
+        yield from generate_parent_child_edges(tree, child_index)
 
 
 def find_max_level(tree, index):
@@ -239,7 +266,10 @@ def generate_cross_edge_range(tree, leaves):
     left_port = CONNECTOR_NAME_TEMPLATE.format(number=0)
     right_port = CONNECTOR_NAME_TEMPLATE.format(number=tree.keys_per_block)
     for index1, index2 in pairwise(leaves):
-        yield EDGE_TEMPLATE.format(
+        template = EDGE_TEMPLATE
+        if is_highlighted(tree[index1]) and is_highlighted(tree[index2]):
+            template = HIGHLIGHTED_EDGE_TEMPLATE
+        yield template.format(
             src_node=generate_node_name(index1),
             src_port=right_port,
             dst_node=generate_node_name(index2),
